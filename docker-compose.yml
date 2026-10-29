@@ -1,6 +1,11 @@
 services:
   zhilian-mcp:
-    build: .
+    # ECS production must use Dockerfile.ecs (reuses shixiseng-mcp:latest Playwright
+    # base). The plain Dockerfile pulls the 2GB official Playwright image and OOMs the
+    # 2GB Aliyun box. Local dev can override: ZHILIAN_DOCKERFILE=Dockerfile docker compose up
+    build:
+      context: .
+      dockerfile: ${ZHILIAN_DOCKERFILE:-Dockerfile.ecs}
     container_name: zhilian-mcp
     restart: unless-stopped
     ports: ["127.0.0.1:18064:18064"]
