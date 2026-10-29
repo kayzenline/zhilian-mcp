@@ -3,7 +3,7 @@ Grok Bot → cloudflared (http2) → Caddy :18065 (Bearer) → Docker zhilian-mc
 → 单个 headless Chromium (Playwright), 一个 BrowserContext，asyncio.Lock 串行，省内存 (mem_limit 700m)。
 
 - 登录 Login: passport.zhaopin.com 扫码 → cookies (`at`, `rt` …) → /data/storage.json。
-- 搜索 Search: 先在已登录 context 里 `page.request` 调 fe-api.zhaopin.com/c/i/search/positions（未登录会被反爬）；失败则 DOM 抓 sou.zhaopin.com（选择器写了多套 fallback，需上线后校准）。
-- 详情 Detail: www.zhaopin.com/jobdetail/<id>.htm DOM。
-- 投递 Apply: Playwright 点「申请职位/立即投递」，监听含 apply/deliver 的 XHR 并返回，供后续逆向成纯 API；默认 dry-run，confirm=True 才真投。
-- 未知/风险 Unknowns: 真实 apply XHR、选择器、xiaoyuan.zhaopin.com 校园站的独立接口；滑块/风控可能出现。
+- 搜索 Search: 打开 `https://xiaoyuan.zhaopin.com/search/index?query=&city=&refcode=4430`，解析 `div.position-card`（职位名 `.position-card__job-name`，薪资 `.position-card__salary`，公司 `.position-card__company__name`，城市 `.position-card__company__work-city`，职位 id 来自 `data-sensors-exposure-option` 的 `jdno`）。实习名企 / 品牌专区（`.practice__item`、`.brand-zone__item`、`/company/`）不是职位，直接丢掉。DOM 没有实习卡片时，才在同一浏览器上下文 POST `cgate.zhaopin.com/positionbusiness/searchrecommend/searchPositions`（`S_SOU_POSITION_TYPE=4` 实习）。`isVerification`、空列表、公司卡片一律丢弃并回到 DOM。不再请求 `fe-api.zhaopin.com`。
+- 详情 Detail: `https://xiaoyuan.zhaopin.com/job/<id>`。标题 `h1.job-banner__name`（去掉其中的薪资），薪资 `.job-banner__salary`，公司 `.company-info__name`，描述 `.job-info__desc`。页面是空壳时再试 `www.zhaopin.com/jobdetail/<id>.htm`。
+- 投递 Apply: 点 `.job-banner__deliver__btn` / 「立即投递」「申请职位」。默认 dry-run，`confirm=True` 才真点。
+- 未知/风险 Unknowns: `/search/index` 未登录会被 302 到 passport；cgate 在部分网络会返回验证页。真实 apply XHR、滑块仍可能出现。
