@@ -160,21 +160,66 @@ async def _campus_api_search(page, keywords, city, page_no):
     return jobs, None
 
 
+async def _settle(page, timeout: int = 8000) -> None:
+    """Wait for the SPA to stop bouncing.
+
+    The campus job page finishes domcontentloaded and *then* navigates (login bounce,
+    city redirect, client-side router), which destroys the JS execution context and makes
+    the next query_selector blow up with "Execution context was destroyed". Load state
+    first, then let the caller retry whatever it wanted to read.
+    """
+    try:
+        await page.wait_for_load_state("load", timeout=timeout)
+    except Exception:
+        pass
+    try:
+        await page.wait_for_load_state("networkidle", timeout=timeout)
+    except Exception:
+        pass
+
+
+async def _probe(page, sel: str, attempts: int = 3):
+    """query_selector that survives a navigation in flight."""
+    last = None
+    for i in range(attempts):
+        try:
+            return await page.query_selector(sel)
+        except Exception as e:  # context destroyed mid-navigation
+            last = e
+            await page.wait_for_timeout(800 * (i + 1))
+            await _settle(page)
+    if last:
+        raise last
+    return None
+
+
 async def _open_job(page, job: str) -> str:
     """Open the campus job page. If it is an empty shell, try the social jobdetail URL."""
     target = job_url(job)
     await page.goto(target, wait_until="domcontentloaded")
-    await page.wait_for_timeout(1200)
-    empty = await page.query_selector(".page-empty, .page-error")
-    title = await page.query_selector("h1.job-banner__name, .summary-plane__title, h1")
+    await _settle(page)
+    empty = await _probe(page, ".page-empty, .page-error")
+    title = await _probe(page, "h1.job-banner__name, .summary-plane__title, h1")
     if empty and not title and not str(job).startswith("http"):
         alt = social_job_url(str(job).strip())
         await page.goto(alt, wait_until="domcontentloaded")
-        await page.wait_for_timeout(1200)
+        await _settle(page)
     return page.url
 
 
 async def _job_fields(page) -> dict:
+    last = None
+    for i in range(3):
+        try:
+            return await _eval_job_fields(page)
+        except Exception as e:  # context destroyed mid-navigation
+            last = e
+            await page.wait_for_timeout(800 * (i + 1))
+            await _settle(page)
+    raise last
+
+
+async def _eval_job_fields(page) -> dict:
     return await page.evaluate("""() => {
       const text = (sel) => {
         const el = document.querySelector(sel);
@@ -309,6 +354,8 @@ async def get_job(job: str) -> dict:
                 "description": description or None,
                 "snippet": (description[:180] if description else None),
             }
+        except Exception as e:
+            return {"ok": False, "error": repr(e), "job": str(job)}
         finally:
             await p.close()
 
