@@ -1,0 +1,12 @@
+http://:18065 {
+	bind 127.0.0.1
+	@authed header Authorization "Bearer {$ZHILIAN_TOKEN}"
+	handle @authed {
+		reverse_proxy 127.0.0.1:18064 {
+			flush_interval -1
+		}
+	}
+	handle {
+		respond "Unauthorized" 401
+	}
+}

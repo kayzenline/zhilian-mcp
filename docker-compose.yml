@@ -1,0 +1,9 @@
+services:
+  zhilian-mcp:
+    build: .
+    container_name: zhilian-mcp
+    restart: unless-stopped
+    ports: ["127.0.0.1:18064:18064"]
+    volumes: ["/opt/zhilian/data:/data"]
+    shm_size: "256m"
+    mem_limit: 700m
