@@ -18,6 +18,8 @@ Connector: `https://<tunnel>/mcp` + header `Authorization: Bearer <token>`.
 Call `login_qr` → returns base64 PNG (also /opt/zhilian/data/qr.png) → scan with 智联 App/WeChat → `login_status` until logged_in → saved to /data/storage.json (survives restarts).
 
 ## Local test
+See [DEV.md](DEV.md) for compose, `/mcp` initialize, the WeChat QR login flow, and how ECS deploy differs (`Dockerfile.ecs`).
+
 `docker compose up --build` then `curl -s -X POST localhost:18064/mcp -H 'Accept: application/json, text/event-stream' -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"t","version":"0"}}}'`
 
 ## Docker images
