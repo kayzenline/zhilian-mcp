@@ -10,12 +10,15 @@ From the repo root:
 
 ```bash
 mkdir -p data
-ZHILIAN_DATA_DIR=./data docker compose up --build
+ZHILIAN_DATA_DIR=./data ZHILIAN_DOCKERFILE=Dockerfile docker compose up --build
 ```
 
 The server listens on `127.0.0.1:18064`. `ZHILIAN_DATA_DIR` defaults to `/opt/zhilian/data`, which is the ECS path. Set it to `./data` on a laptop so Compose does not need `/opt/zhilian`.
 
-`Dockerfile` (the one Compose builds) is the full Playwright image. Use it locally. Do not point Compose at `Dockerfile.ecs`.
+Compose builds `Dockerfile.ecs` by default, because that is what production runs and a default
+`docker compose build` on the ECS box must not pull the 2GB official Playwright base. `Dockerfile`
+is the full Playwright image (multi-platform, no local base image needed) — select it with
+`ZHILIAN_DOCKERFILE=Dockerfile` on a laptop.
 
 Parser checks do not need a browser:
 
@@ -102,9 +105,22 @@ Unit tests cover fixtures only. After `login_status` reports `logged_in`:
 Production on the Aliyun box uses `Dockerfile.ecs`, not `Dockerfile`:
 
 ```bash
-docker build -f Dockerfile.ecs -t zhilian-mcp:latest .
+cd /opt/zhilian/src
+PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple docker compose build   # Dockerfile.ecs, host network
+docker compose up -d --no-build
 ```
 
-`Dockerfile.ecs` is `FROM shixiseng-mcp:latest` so the 2GB box does not pull the full Playwright base again. Leave that file in place. Compose in this repo builds `Dockerfile`; on the box, build with `-f Dockerfile.ecs` (or point the compose `build` at that file) and keep the data volume at `/opt/zhilian/data`.
+Raw equivalent:
+
+```bash
+docker build -f Dockerfile.ecs --network host \
+  --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple -t zhilian-mcp:latest .
+```
+
+`pypi.org` stalls from this host (a 38MB wheel never finished in 15 minutes); the mirror flag is what
+makes the build take about a minute. Build with `--network host` so the builder does not go through
+Docker's bridge DNS.
+
+`Dockerfile.ecs` is `FROM shixiseng-mcp:latest` so the 2GB box does not pull the full Playwright base again. Leave that file in place. Compose now defaults to `Dockerfile.ecs`, so a plain `docker compose build` on the box is safe; keep the data volume at `/opt/zhilian/data`.
 
 Caddy (`deploy/Caddyfile.snippet`) binds `127.0.0.1:18065` and checks `Authorization: Bearer` against `ZHILIAN_TOKEN`. cloudflared (`deploy/cloudflared-zhilian.service`) publishes that port. The app container stays on `127.0.0.1:18064`. Generate the token on the server (`openssl rand -hex 32`); `deploy/zhilian.env.example` is only a placeholder. The rest of the host commands are in the README.

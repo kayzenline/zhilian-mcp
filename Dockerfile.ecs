@@ -1,9 +1,15 @@
 # ECS production image: reuse shixiseng Playwright base to avoid OOM on 2GB Aliyun.
 # Build: docker build -f Dockerfile.ecs -t zhilian-mcp:latest .
+#
+# PIP_INDEX_URL is optional. pypi.org stalls from the Aliyun box, so production
+# builds pass a domestic mirror:
+#   docker build -f Dockerfile.ecs --network host \
+#     --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple -t zhilian-mcp:latest .
 FROM shixiseng-mcp:latest
+ARG PIP_INDEX_URL=
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir ${PIP_INDEX_URL:+--index-url $PIP_INDEX_URL} -r requirements.txt
 COPY app/ /app/
 ENV DATA_DIR=/data PORT=18064 TZ=Asia/Shanghai
 VOLUME /data
