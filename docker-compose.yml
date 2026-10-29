@@ -9,7 +9,6 @@ services:
       # pypi.org stalls from the Aliyun box; export PIP_INDEX_URL to a mirror when building there.
       args:
         PIP_INDEX_URL: ${PIP_INDEX_URL:-}
-      network: host
     container_name: zhilian-mcp
     restart: unless-stopped
     ports: ["127.0.0.1:18064:18064"]

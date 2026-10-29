@@ -1,15 +1,23 @@
 # ECS production image: reuse shixiseng Playwright base to avoid OOM on 2GB Aliyun.
-# Build: docker build -f Dockerfile.ecs -t zhilian-mcp:latest .
+# Build (from the repo root on the box):
+#   PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple docker compose build
+# or:
+#   docker build -f Dockerfile.ecs --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple -t zhilian-mcp:latest .
 #
-# PIP_INDEX_URL is optional. pypi.org stalls from the Aliyun box, so production
-# builds pass a domestic mirror:
-#   docker build -f Dockerfile.ecs --network host \
-#     --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple -t zhilian-mcp:latest .
+# PIP_INDEX_URL is optional; pypi.org stalls from the Aliyun box.
 FROM shixiseng-mcp:latest
 ARG PIP_INDEX_URL=
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --no-cache-dir ${PIP_INDEX_URL:+--index-url $PIP_INDEX_URL} -r requirements.txt
+# shixiseng-mcp:latest already has Playwright 1.47.0 with the matching browser
+# (chromium-1134 under /ms-playwright). requirements.txt pins the 1.48.0 client for
+# the official Playwright base that ./Dockerfile uses. Installing that pin here makes
+# Playwright look for chromium-1140, which the base does not ship, and every tool call
+# then fails with "Executable doesn't exist at /ms-playwright/chromium-1140". We are not
+# going to download another 170MB browser on a 2GB box, so skip the pin and keep the
+# base's Playwright.
+RUN grep -vE '^[[:space:]]*playwright[[:space:]]*==' requirements.txt > /tmp/requirements-ecs.txt \
+ && pip install --no-cache-dir ${PIP_INDEX_URL:+--index-url $PIP_INDEX_URL} -r /tmp/requirements-ecs.txt
 COPY app/ /app/
 ENV DATA_DIR=/data PORT=18064 TZ=Asia/Shanghai
 VOLUME /data

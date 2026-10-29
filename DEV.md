@@ -106,20 +106,21 @@ Production on the Aliyun box uses `Dockerfile.ecs`, not `Dockerfile`:
 
 ```bash
 cd /opt/zhilian/src
-PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple docker compose build   # Dockerfile.ecs, host network
+PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple docker compose build   # builds Dockerfile.ecs
 docker compose up -d --no-build
 ```
 
 Raw equivalent:
 
 ```bash
-docker build -f Dockerfile.ecs --network host \
+docker build -f Dockerfile.ecs \
   --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple -t zhilian-mcp:latest .
 ```
 
-`pypi.org` stalls from this host (a 38MB wheel never finished in 15 minutes); the mirror flag is what
-makes the build take about a minute. Build with `--network host` so the builder does not go through
-Docker's bridge DNS.
+`pypi.org` stalls from this host (a 38MB wheel made no progress in 15 minutes); the mirror flag takes
+the build to about a minute. `Dockerfile.ecs` deliberately skips the `playwright==` pin: the base image
+ships Playwright 1.47.0 with `chromium-1134`, and installing the 1.48.0 client makes every tool call
+fail with `Executable doesn't exist at /ms-playwright/chromium-1140`.
 
 `Dockerfile.ecs` is `FROM shixiseng-mcp:latest` so the 2GB box does not pull the full Playwright base again. Leave that file in place. Compose now defaults to `Dockerfile.ecs`, so a plain `docker compose build` on the box is safe; keep the data volume at `/opt/zhilian/data`.
 
