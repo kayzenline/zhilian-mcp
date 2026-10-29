@@ -366,6 +366,16 @@ async def apply_job(job: str, confirm: bool = False) -> dict:
         p = await (await ctx()).new_page()
         try:
             url = await _open_job(p, job)
+            # The 立即投递 banner paints a few seconds after the SPA settles, so wait for it
+            # rather than racing the DOM (a 1.2s probe found nothing on a live card).
+            try:
+                await p.wait_for_selector(
+                    ".job-banner__deliver__btn, .summary-plane__action a, a:has-text('申请职位')",
+                    timeout=15000,
+                    state="visible",
+                )
+            except Exception:
+                pass
             btn = None
             for sel in [
                 ".job-banner__deliver__btn",
@@ -376,7 +386,7 @@ async def apply_job(job: str, confirm: bool = False) -> dict:
                 "text=申请职位",
                 ".summary-plane__action a",
             ]:
-                btn = await p.query_selector(sel)
+                btn = await _probe(p, sel)
                 if not btn:
                     continue
                 class_name = (await btn.get_attribute("class")) or ""
